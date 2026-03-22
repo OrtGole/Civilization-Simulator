@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Conflict Simulator</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.441.0/font/lucide.min.css">
+    <script type="importmap">
+    {
+        "imports": {
+            "lucide": "https://esm.sh/lucide@0.441.0"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="app">
+        <canvas id="gameCanvas" style="touch-action: none;"></canvas>
+        
+        <div id="ui-overlay">
+            <div id="toolbar">
+                <div class="tool-group" id="editor-tools">
+                    <button class="tool-btn active" data-tool="brush-land" title="Paint Land">🏝️</button>
+                    <button class="tool-btn" data-tool="brush-water" title="Paint Water">🌊</button>
+                    <button class="tool-btn" data-tool="pan" title="Pan Camera">🖐️</button>
+                    <div id="brush-size-control">
+                        <span>Size</span>
+                        <input type="range" id="brush-size" min="1" max="20" value="5">
+                    </div>
+                    <button class="tool-btn" id="clear-map" title="Reset Map">🗑️</button>
+                    <button class="tool-btn" id="options-btn" title="Options">⚙️</button>
+                    <button class="tool-btn" id="map-mode-btn" title="Map Mode: Political">🗺️</button>
+                </div>
+                
+                <div class="tool-group" id="country-tools">
+                    <button class="tool-btn" data-tool="place-country" title="Place Country">🚩</button>
+                    <button class="tool-btn" data-tool="diplomacy" title="Diplomacy">🤝</button>
+                    <button class="tool-btn" data-tool="manage-nation" title="Manage Nation">🪄</button>
+                </div>
+
+                <div class="tool-group" id="sim-controls">
+                    <button id="play-pause" class="tool-btn">▶️</button>
+                    <div id="speed-container">
+                        <button id="speed-btn" class="tool-btn" title="Simulation Speed">⏳</button>
+                        <div id="speed-slider-wrap" class="popover hidden">
+                            <input type="range" id="sim-speed" min="1" max="50" value="10">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="toggle-list">📊</button>
+            <div id="country-list-container" class="collapsed">
+                <div id="country-list">
+                    <!-- Countries will be listed here -->
+                </div>
+            </div>
+
+            <div id="diplomacy-actions" class="hidden">
+                <div class="actions-header" id="diplomacy-drag-handle">
+                    <span class="drag-icon">⋮⋮</span> Selection: <span id="selection-count">0</span>
+                </div>
+                <div class="actions-buttons">
+                    <button id="action-war" class="action-btn war">⚔️ Declare War</button>
+                    <button id="action-deathwar" class="action-btn deathwar">💀 Fight to the Death</button>
+                    <button id="action-ally" class="action-btn ally">🛡️ Form Alliance</button>
+                    <button id="action-perm-ally" class="action-btn perm-ally">💎 Permanent Alliance</button>
+                    <button id="action-clear" class="action-btn">❌ Clear</button>
+                </div>
+            </div>
+
+            <div id="stats-panel">
+                <div id="sim-stats">
+                    Year: <span id="year-val">1000</span> | Nations: <span id="nation-count">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="country-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>New Country</h3>
+                <input type="text" id="country-name" placeholder="Name...">
+                <div class="color-picker">
+                    <label>Color:</label>
+                    <input type="color" id="country-color" value="#ff0000">
+                </div>
+                <div class="option-item">
+                    <label class="switch-label">
+                        <span>Tribe Mode</span>
+                        <input type="checkbox" id="country-is-tribe">
+                    </label>
+                    <p class="option-desc">Tribes are much weaker and expand slower than full nations.</p>
+                </div>
+                <div class="flag-preview" id="flag-preview">
+                    <!-- Simple generated flag -->
+                </div>
+                <button id="confirm-country">Establish</button>
+                <button id="cancel-country">Cancel</button>
+            </div>
+        </div>
+
+        <div id="options-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Simulation Options</h3>
+                <div class="option-item">
+                    <label class="switch-label">
+                        <span>Enable Revolts</span>
+                        <input type="checkbox" id="revolts-toggle">
+                    </label>
+                    <p class="option-desc">Internal strife can cause new nations to rise from the territory of existing ones.</p>
+                </div>
+                <div class="option-item">
+                    <label class="switch-label">
+                        <span>Enable Civil Wars</span>
+                        <input type="checkbox" id="civilwars-toggle">
+                    </label>
+                    <p class="option-desc">Nations can randomly split into two warring factions, regardless of stability.</p>
+                </div>
+                <div class="option-item">
+                    <label class="switch-label">
+                        <span>Enable Alliances</span>
+                        <input type="checkbox" id="alliances-toggle" checked>
+                    </label>
+                    <p class="option-desc">Allows nations to form defensive pacts and alliances with each other.</p>
+                </div>
+                <button id="close-options">Close</button>
+            </div>
+        </div>
+
+        <div id="nation-control-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="nc-title">Manage Nation</h3>
+                <div class="control-grid">
+                    <button id="nc-collapse" class="action-btn">🗑️ Collapse</button>
+                    <button id="nc-civilwar" class="action-btn">💥 Civil War</button>
+                    <button id="nc-stronger" class="action-btn">💪 Strengthen</button>
+                    <button id="nc-weaker" class="action-btn">🤕 Weaken</button>
+                    <button id="nc-unite" class="action-btn">🔗 Unite with...</button>
+                    <button id="nc-focustree" class="action-btn">🌳 Focus Tree</button>
+                </div>
+                <button id="nc-close" class="action-btn">Close</button>
+            </div>
+        </div>
+
+        <div id="focus-tree-modal" class="modal hidden">
+            <div class="modal-content focus-tree-content">
+                <h3>Focus Tree Editor: <span id="ft-country-name"></span></h3>
+                <p class="option-desc" style="margin-bottom: 10px; color: #4f46e5; font-weight: 500;">
+                    Define goals. Custom descriptions are interpreted by AI to ensure the nation succeeds at all cost.
+                </p>
+                <div id="focus-list-container">
+                    <!-- Foci will be listed here -->
+                </div>
+                <div class="focus-controls">
+                    <button id="add-focus-btn" class="action-btn">➕ Add Focus</button>
+                    <button id="save-focus-tree" class="action-btn ally">💾 Save & Apply</button>
+                    <button id="close-focus-tree" class="action-btn">❌ Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
